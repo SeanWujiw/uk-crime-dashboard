@@ -8,8 +8,30 @@ from folium import Icon, Marker
 from folium.plugins import MarkerCluster
 from branca.element import Figure
 
-# ─── Load and preprocess data ─────────────────────────────────────────────────
-merged_df = pd.read_csv("crime_data_merged.csv")
+# ─── STEP 0: “Download-if-missing” snippet ────────────────────────────────────
+import pathlib, requests
+
+# Create a “data” directory next to this script
+DATA_DIR = pathlib.Path(__file__).parent / "data"
+DATA_DIR.mkdir(exist_ok=True)
+
+# Define where we’ll store the CSV locally, and the S3 URL
+CSV_PATH = DATA_DIR / "crime_data_merged.csv"
+CSV_URL  = "https://uk-crime-dashboard-data.s3.eu-west-2.amazonaws.com/crime_data_merged.csv"
+
+# If the CSV isn’t already on disk, fetch it from S3
+if not CSV_PATH.exists():
+    print("Downloading merged CSV from S3…")
+    with requests.get(CSV_URL, stream=True) as r:
+        r.raise_for_status()
+        with open(CSV_PATH, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+    print("Download complete →", CSV_PATH)
+
+# Load the dataframe exactly as before
+merged_df = pd.read_csv(CSV_PATH)
+# ───────────────────────────────────────────────────────────────────────────────
 
 # Function to strip trailing codes from LSOA names
 def extract_location_name(lsoa_name):
@@ -68,7 +90,7 @@ app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.title = "UK Crime Dashboard"
 server = app.server  # for deployment
 
-# ─── Tab 1: Bar Chart Dashboard ─────────────────────────────────────────────────
+# ─── Tab 1: Bar Chart Dashboard ────────────────────────────────────────────────
 tab1_layout = html.Div(
     [
         html.H3("Bar Chart Dashboard", style={"color": "white"}),
@@ -228,7 +250,8 @@ def update_bar_chart(selected_month, selected_metric, selected_crimes, rank_choi
         y=y_axis_label,
         orientation="h",
         title=(
-            f"Top {num_results} {'Locations' if 'combine' in combine_toggle else 'LSOAs'} "
+            f"Top {num_results} "
+            f"{'Locations' if 'combine' in combine_toggle else 'LSOAs'} "
             f"by {'Total Crimes' if selected_metric=='total' else 'Normalised Crime Rate'} "
             f"– {'All Months' if selected_month=='all' else selected_month} "
             f"({'Lowest' if ascending else 'Highest'})"
@@ -245,7 +268,7 @@ def update_bar_chart(selected_month, selected_metric, selected_crimes, rank_choi
     return fig
 
 
-# ─── Tab 2: Time Series Explorer ─────────────────────────────────────────────────
+# ─── Tab 2: Time Series Explorer ────────────────────────────────────────────────
 tab2_layout = html.Div(
     [
         html.H3("Crime Time Series Explorer", style={"color": "white"}),
@@ -408,16 +431,30 @@ def update_map(selected_locations):
     return html_str
 
 
-# ─── App Layout with Tabs ───────────────────────────────────────────────────────
+# ─── App Layout with Tabs + Footer Credit ───────────────────────────────────────
 app.layout = html.Div(
     [
-        html.H2("UK Crime Data Explorer (England, Wales & Northern Ireland, Jan–Mar 2025)", style={"textAlign": "center", "color": "white"}),
+        html.H2(
+            "UK Crime Data Explorer (England, Wales & Northern Ireland, Jan–Mar 2025)",
+            style={"textAlign": "center", "color": "white"},
+        ),
         dcc.Tabs(
             [
                 dcc.Tab(label="Bar Chart", children=[tab1_layout]),
                 dcc.Tab(label="Time Series", children=[tab2_layout]),
                 dcc.Tab(label="Searchable Map", children=[tab3_layout]),
             ]
+        ),
+        # ─── Footer credit ────────────────────────────────────────────────────────
+        html.Div(
+            "Built by Sean Wujiw",
+            style={
+                "textAlign": "left-align",
+                "color": "lightgray",
+                "fontSize": "0.8rem",
+                "marginTop": "20px",
+                "marginBottom": "20px",
+            },
         ),
     ],
     style={"backgroundColor": "#000000"},
