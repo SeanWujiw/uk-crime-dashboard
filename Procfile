@@ -1,1 +1,0 @@
-web: gunicorn crime_dashboard:server
