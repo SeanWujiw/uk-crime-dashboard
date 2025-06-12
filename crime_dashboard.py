@@ -10,7 +10,7 @@ from branca.element import Figure
 
 #### Load data ####
 
-# Read the merged crime dataset (AWS S3 stored CSV). This contains all crime incidents
+# Read the merged crime dataset (locally stored CSV). This contains all crime incidents
 # for January–March 2025 across England, Wales, and Northern Ireland, joined with population/area data.
 # The csv being read was created in Jupyter Notebooks after cleaning and merging each crime and population data csv file
 merged_df = pd.read_csv("crime_data_merged.csv")
